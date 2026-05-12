@@ -16,7 +16,7 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 UPDATE_API_URL = "https://api.github.com/repos/kaiiii777/pic_shuiyin/releases/latest"
 UPDATE_ASSET_NAME = "图片水印工具.exe"
 
@@ -85,6 +85,7 @@ class WatermarkApp:
 
         self.create_ui()
         self.add_watermark()
+        self.root.after(1500, self.start_auto_update_check)
 
     def create_ui(self):
         main_frame = ttk.Frame(self.root, padding="5")
@@ -262,7 +263,7 @@ class WatermarkApp:
         action_frame = ttk.Frame(bottom_frame)
         action_frame.pack(pady=3)
         ttk.Button(action_frame, text="开始处理", command=self.start_processing).pack(side=tk.LEFT, padx=5)
-        ttk.Button(action_frame, text="检查更新", command=self.start_update_check).pack(side=tk.LEFT, padx=5)
+        ttk.Button(action_frame, text="检查更新", command=lambda: self.start_update_check(False)).pack(side=tk.LEFT, padx=5)
 
         self.update_watermark_list()
 
@@ -638,21 +639,26 @@ class WatermarkApp:
             return sys.executable
         return os.path.abspath(__file__)
 
-    def start_update_check(self):
-        thread = threading.Thread(target=self.check_for_updates, daemon=True)
+    def start_auto_update_check(self):
+        self.start_update_check(True)
+
+    def start_update_check(self, silent_when_latest=False):
+        thread = threading.Thread(target=lambda: self.check_for_updates(silent_when_latest), daemon=True)
         thread.start()
 
-    def check_for_updates(self):
+    def check_for_updates(self, silent_when_latest=False):
         try:
             self.status_label.config(text="正在检查更新...")
             release = self.fetch_latest_release()
             remote_version = release.get("tag_name", "").strip()
             if not remote_version:
-                messagebox.showinfo("检查更新", "没有找到有效的版本号。")
+                if not silent_when_latest:
+                    messagebox.showinfo("检查更新", "没有找到有效的版本号。")
                 return
 
             if not self.is_newer_version(remote_version):
-                messagebox.showinfo("检查更新", f"当前已是最新版本：{APP_VERSION}")
+                if not silent_when_latest:
+                    messagebox.showinfo("检查更新", f"当前已是最新版本：{APP_VERSION}")
                 return
 
             asset = self.find_update_asset(release)
@@ -663,7 +669,14 @@ class WatermarkApp:
                 )
                 return
 
-            if not messagebox.askyesno("发现新版本", f"发现新版本 {remote_version}，是否立即下载并更新？"):
+            release_notes = self.format_release_notes(release)
+            message = (
+                f"发现新版本 {remote_version}\n"
+                f"当前版本 {APP_VERSION}\n\n"
+                f"更新内容：\n{release_notes}\n\n"
+                "是否立即下载并更新？"
+            )
+            if not messagebox.askyesno("发现新版本", message):
                 return
 
             self.download_and_install_update(asset, remote_version)
@@ -691,6 +704,16 @@ class WatermarkApp:
         )
         with urllib.request.urlopen(request, timeout=20) as response:
             return json.loads(response.read().decode("utf-8"))
+
+    def format_release_notes(self, release):
+        notes = (release.get("body") or "").strip()
+        if not notes:
+            return "本次更新未填写说明。"
+        notes = notes.replace("\r\n", "\n").replace("\r", "\n")
+        max_length = 900
+        if len(notes) > max_length:
+            notes = notes[:max_length].rstrip() + "\n..."
+        return notes
 
     def find_update_asset(self, release):
         assets = release.get("assets", [])
