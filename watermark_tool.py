@@ -10,13 +10,13 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
-from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageTk
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageTk
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import threading
 
 
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 UPDATE_API_URL = "https://api.github.com/repos/kaiiii777/pic_shuiyin/releases/latest"
 UPDATE_ASSET_NAME = "图片水印工具.exe"
 
@@ -52,6 +52,15 @@ class WatermarkApp:
         self.crop_ratio_h = tk.DoubleVar(value=1)
         self.crop_focus_x = tk.DoubleVar(value=50)
         self.crop_focus_y = tk.DoubleVar(value=50)
+        self.enable_resize = tk.BooleanVar(value=False)
+        self.resize_width = tk.IntVar(value=900)
+        self.resize_height = tk.IntVar(value=900)
+        self.resize_mode = tk.StringVar(value="fit")
+        self.resize_bg_color = tk.StringVar(value="white")
+        self.resize_filter_text = tk.StringVar(value="")
+        self.resize_filter_rule = tk.StringVar(value="contains")
+        self.resize_output_mode = tk.StringVar(value="suffix")
+        self.resize_suffix = tk.StringVar(value="_resized")
         self.opacity_text = tk.StringVar(value="100%")
         self.loading_watermark = False
         self.preview_photo = None
@@ -90,6 +99,9 @@ class WatermarkApp:
     def create_ui(self):
         main_frame = ttk.Frame(self.root, padding="5")
         main_frame.pack(fill=tk.BOTH, expand=True)
+        style = ttk.Style()
+        style.configure("TLabelframe", padding=8)
+        style.configure("TButton", padding=(10, 4))
 
         # ===== 顶部 =====
         top_frame = ttk.Frame(main_frame)
@@ -102,7 +114,7 @@ class WatermarkApp:
         self.source_count_label.pack(side=tk.LEFT, padx=10)
         ttk.Checkbutton(
             top_frame,
-            text="递归子文件夹",
+            text="处理子文件夹",
             variable=self.recursive_folders
         ).pack(side=tk.LEFT, padx=5)
 
@@ -146,6 +158,48 @@ class WatermarkApp:
         ttk.Label(crop_frame, text=":").pack(side=tk.LEFT)
         ttk.Entry(crop_frame, textvariable=self.crop_ratio_h, width=6).pack(side=tk.LEFT, padx=2)
         ttk.Button(crop_frame, text="应用比例", command=self.update_preview).pack(side=tk.LEFT, padx=8)
+
+        resize_frame = ttk.LabelFrame(main_frame, text="尺寸修改", padding="8")
+        resize_frame.pack(fill=tk.X, pady=3)
+
+        ttk.Checkbutton(
+            resize_frame,
+            text="启用尺寸修改",
+            variable=self.enable_resize,
+            command=self.update_preview
+        ).grid(row=0, column=0, sticky=tk.W, padx=(4, 12), pady=3)
+        ttk.Label(resize_frame, text="目标宽度:").grid(row=0, column=1, sticky=tk.E, padx=(8, 4), pady=3)
+        ttk.Spinbox(resize_frame, from_=1, to=20000, textvariable=self.resize_width, width=8, command=self.update_preview).grid(row=0, column=2, sticky=tk.W, pady=3)
+        ttk.Label(resize_frame, text="目标高度:").grid(row=0, column=3, sticky=tk.E, padx=(14, 4), pady=3)
+        ttk.Spinbox(resize_frame, from_=1, to=20000, textvariable=self.resize_height, width=8, command=self.update_preview).grid(row=0, column=4, sticky=tk.W, pady=3)
+
+        ttk.Label(resize_frame, text="缩放模式:").grid(row=1, column=0, sticky=tk.W, padx=4, pady=3)
+        ttk.Radiobutton(resize_frame, text="留白适配", variable=self.resize_mode, value="fit", command=self.update_preview).grid(row=1, column=1, sticky=tk.W, pady=3)
+        ttk.Radiobutton(resize_frame, text="裁剪填充", variable=self.resize_mode, value="fill", command=self.update_preview).grid(row=1, column=2, sticky=tk.W, pady=3)
+        ttk.Radiobutton(resize_frame, text="拉伸填充", variable=self.resize_mode, value="stretch", command=self.update_preview).grid(row=1, column=3, sticky=tk.W, pady=3)
+
+        ttk.Label(resize_frame, text="白边颜色:").grid(row=2, column=0, sticky=tk.W, padx=4, pady=3)
+        ttk.Combobox(
+            resize_frame,
+            textvariable=self.resize_bg_color,
+            values=("white", "black", "#f5f5f5", "#ffffff"),
+            width=12
+        ).grid(row=2, column=1, sticky=tk.W, pady=3)
+        ttk.Label(resize_frame, text="仅留白适配有效").grid(row=2, column=2, columnspan=2, sticky=tk.W, padx=8, pady=3)
+
+        ttk.Label(resize_frame, text="文件名包含(留空全部):").grid(row=3, column=0, sticky=tk.W, padx=4, pady=3)
+        ttk.Entry(resize_frame, textvariable=self.resize_filter_text, width=20).grid(row=3, column=1, columnspan=2, sticky=tk.W, pady=3)
+        ttk.Combobox(
+            resize_frame,
+            textvariable=self.resize_filter_rule,
+            values=("contains", "starts with", "ends with"),
+            width=12,
+            state="readonly"
+        ).grid(row=3, column=3, sticky=tk.W, pady=3)
+
+        ttk.Radiobutton(resize_frame, text="覆盖原文件", variable=self.resize_output_mode, value="overwrite").grid(row=4, column=0, sticky=tk.W, padx=4, pady=3)
+        ttk.Radiobutton(resize_frame, text="添加后缀", variable=self.resize_output_mode, value="suffix").grid(row=4, column=1, sticky=tk.W, pady=3)
+        ttk.Entry(resize_frame, textvariable=self.resize_suffix, width=12).grid(row=4, column=2, sticky=tk.W, pady=3)
 
         # ===== 中部 =====
         middle_frame = ttk.Frame(main_frame)
@@ -516,13 +570,18 @@ class WatermarkApp:
             except ValueError:
                 pass
         original_name = os.path.basename(img_path)
+        resize_applies = self.enable_resize.get() and self.should_resize_image(img_path)
 
-        if self.use_original_name.get():
+        if resize_applies and self.resize_output_mode.get() == "overwrite":
+            output_name = original_name
+        elif self.use_original_name.get():
             output_name = original_name
         else:
             name, ext = os.path.splitext(original_name)
             prefix = self.clean_filename_part(self.output_prefix.get())
             suffix = self.clean_filename_part(self.output_suffix.get())
+            if resize_applies and self.resize_output_mode.get() == "suffix":
+                suffix += self.clean_filename_part(self.resize_suffix.get())
             output_name = f"{prefix}{name}{suffix}{ext}"
 
         return os.path.join(save_dir, output_name)
@@ -591,6 +650,69 @@ class WatermarkApp:
         if crop_box == (0, 0, img.width, img.height):
             return img
         return img.crop(crop_box)
+
+    def get_resize_size(self):
+        try:
+            width = int(self.resize_width.get())
+            height = int(self.resize_height.get())
+        except (tk.TclError, ValueError):
+            return None
+        if width <= 0 or height <= 0:
+            return None
+        return width, height
+
+    def should_resize_image(self, img_path):
+        if not self.enable_resize.get():
+            return False
+
+        keyword = self.resize_filter_text.get().strip().lower()
+        if not keyword:
+            return True
+
+        filename = os.path.basename(img_path).lower()
+        rule = self.resize_filter_rule.get()
+        if rule == "starts with":
+            return filename.startswith(keyword)
+        if rule == "ends with":
+            return filename.endswith(keyword)
+        return keyword in filename
+
+    def resize_image(self, img, img_path=None):
+        if img_path and not self.should_resize_image(img_path):
+            return img
+        if not self.enable_resize.get():
+            return img
+
+        size = self.get_resize_size()
+        if size is None:
+            return img
+
+        target_w, target_h = size
+        mode = self.resize_mode.get()
+        if mode == "stretch":
+            return img.resize((target_w, target_h), Image.LANCZOS)
+
+        if mode == "fill":
+            return ImageOps.fit(img, (target_w, target_h), method=Image.LANCZOS, centering=(0.5, 0.5))
+
+        resized = img.copy()
+        resized.thumbnail((target_w, target_h), Image.LANCZOS)
+        bg_color = self.resize_bg_color.get().strip() or "white"
+        try:
+            canvas = Image.new("RGB", (target_w, target_h), bg_color)
+        except ValueError:
+            canvas = Image.new("RGB", (target_w, target_h), "white")
+        if resized.mode in ("RGBA", "LA"):
+            paste_img = resized.convert("RGBA")
+            x = (target_w - paste_img.width) // 2
+            y = (target_h - paste_img.height) // 2
+            canvas.paste(paste_img, (x, y), paste_img)
+        else:
+            paste_img = resized.convert("RGB")
+            x = (target_w - paste_img.width) // 2
+            y = (target_h - paste_img.height) // 2
+            canvas.paste(paste_img, (x, y))
+        return canvas
 
     def get_canvas_crop_box(self, crop_box, scale):
         left, top, right, bottom = crop_box
@@ -1050,6 +1172,8 @@ del "%~f0"
         try:
             img = Image.open(img_path)
             img = self.normalize_image_orientation(img)
+            if not self.is_crop_enabled():
+                img = self.resize_image(img, img_path)
             original_w, original_h = img.size
 
             canvas_w = self.canvas.winfo_width()
@@ -1157,7 +1281,10 @@ del "%~f0"
             crop_text = ""
             if self.is_crop_enabled() and self.crop_box:
                 crop_text = f" | 裁切位置: {int(self.crop_focus_x.get())}%, {int(self.crop_focus_y.get())}%"
-            self.preview_info.config(text=f"{os.path.basename(img_path)}{crop_text} | 水印: {valid_count} 个")
+            resize_text = ""
+            if self.should_resize_image(img_path):
+                resize_text = f" | 尺寸: {img.width}x{img.height}"
+            self.preview_info.config(text=f"{os.path.basename(img_path)}{crop_text}{resize_text} | 水印: {valid_count} 个")
 
         except Exception as e:
             self.preview_info.config(text=f"预览失败: {e}")
@@ -1171,10 +1298,14 @@ del "%~f0"
         if crop_enabled and self.get_crop_ratio() is None:
             messagebox.showwarning("警告", "请设置有效的裁切比例！")
             return
+        resize_enabled = self.enable_resize.get()
+        if resize_enabled and self.get_resize_size() is None:
+            messagebox.showwarning("警告", "请设置有效的目标尺寸！")
+            return
 
         valid_wms = [wm for wm in self.watermarks if wm.content and os.path.exists(wm.content)]
-        if not valid_wms and not crop_enabled:
-            messagebox.showwarning("警告", "请先添加有效的水印图片，或启用图片裁切！")
+        if not valid_wms and not crop_enabled and not resize_enabled:
+            messagebox.showwarning("警告", "请先添加有效的水印图片，或启用图片裁切/尺寸修改！")
             return
 
         output_dir = self.output_dir.get().strip()
@@ -1185,6 +1316,11 @@ del "%~f0"
         overwrite_risks = [
             img_path for img_path in self.source_images
             if os.path.abspath(self.get_output_path(img_path, output_dir)) == os.path.abspath(img_path)
+            and not (
+                resize_enabled
+                and self.resize_output_mode.get() == "overwrite"
+                and self.should_resize_image(img_path)
+            )
         ]
         if overwrite_risks:
             messagebox.showwarning(
@@ -1201,12 +1337,18 @@ del "%~f0"
 
         for i, img_path in enumerate(self.source_images):
             try:
+                should_resize = self.should_resize_image(img_path)
+                if resize_enabled and not should_resize and not crop_enabled and not valid_wms:
+                    continue
+
                 self.status_label.config(text=f"处理中: {os.path.basename(img_path)}")
                 self.progress['value'] = i + 1
                 self.root.update_idletasks()
 
-                img = self.normalize_image_orientation(Image.open(img_path))
+                with Image.open(img_path) as src_img:
+                    img = self.normalize_image_orientation(src_img.copy())
                 result = self.center_crop_to_ratio(img, img_path)
+                result = self.resize_image(result, img_path)
                 result = self.apply_watermarks(result)
 
                 output_path = self.get_output_path(img_path, output_dir)
