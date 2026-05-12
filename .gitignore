@@ -1,0 +1,8 @@
+build/
+dist/
+dist_new/
+__pycache__/
+*.pyc
+*.spec.bak
+*.log
+*.exe
