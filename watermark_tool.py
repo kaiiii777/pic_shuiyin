@@ -695,7 +695,7 @@ class WatermarkApp:
     def find_update_asset(self, release):
         assets = release.get("assets", [])
         for asset in assets:
-            if asset.get("name") == UPDATE_ASSET_NAME:
+            if asset.get("name") == UPDATE_ASSET_NAME or asset.get("label") == UPDATE_ASSET_NAME:
                 return asset
         for asset in assets:
             name = asset.get("name", "")
