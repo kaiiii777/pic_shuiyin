@@ -16,7 +16,7 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 
 
-APP_VERSION = "1.0.8"
+APP_VERSION = "1.0.9"
 UPDATE_API_URL = "https://api.github.com/repos/kaiiii777/pic_shuiyin/releases/latest"
 UPDATE_ASSET_NAME = "图片水印工具.exe"
 
@@ -142,7 +142,6 @@ class WatermarkApp:
         utility_frame = ttk.Frame(top_frame)
         utility_frame.pack(side=tk.RIGHT)
         ttk.Button(utility_frame, text="检查更新", command=lambda: self.start_update_check(False)).pack(side=tk.LEFT, padx=(4, 2))
-        ttk.Button(utility_frame, text="导出图片", command=self.start_processing, style="Accent.TButton").pack(side=tk.LEFT, padx=(8, 2))
 
         ttk.Label(top_frame, text="源图片:").pack(side=tk.LEFT, padx=5)
         ttk.Button(top_frame, text="选择图片", command=self.select_images).pack(side=tk.LEFT, padx=2)
@@ -339,17 +338,24 @@ class WatermarkApp:
         ttk.Button(info_frame, text="刷新", command=self.update_preview).pack(side=tk.RIGHT)
 
         # ===== 底部 =====
-        bottom_frame = ttk.Frame(main_frame)
+        bottom_frame = ttk.LabelFrame(main_frame, text="处理进度", padding="8")
         bottom_frame.pack(fill=tk.X, pady=3)
 
-        self.progress = ttk.Progressbar(bottom_frame, mode='determinate')
-        self.progress.pack(fill=tk.X, pady=3)
-        self.status_label = ttk.Label(bottom_frame, text="就绪")
-        self.status_label.pack()
-
         action_frame = ttk.Frame(bottom_frame)
-        action_frame.pack(pady=3)
-        ttk.Button(action_frame, text="导出图片", command=self.start_processing, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
+        action_frame.pack(fill=tk.X)
+
+        self.status_label = ttk.Label(action_frame, text="就绪")
+        self.status_label.pack(side=tk.LEFT)
+
+        ttk.Button(
+            action_frame,
+            text="开始处理",
+            command=self.start_processing,
+            style="Accent.TButton"
+        ).pack(side=tk.RIGHT, padx=(10, 0))
+
+        self.progress = ttk.Progressbar(bottom_frame, mode='determinate')
+        self.progress.pack(fill=tk.X, pady=(8, 0))
 
         self.update_watermark_list()
 
