@@ -10,15 +10,17 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
+import webbrowser
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageTk
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import threading
 
 
-APP_VERSION = "1.0.3"
+APP_VERSION = "1.0.4"
 UPDATE_API_URL = "https://api.github.com/repos/kaiiii777/pic_shuiyin/releases/latest"
 UPDATE_ASSET_NAME = "图片水印工具.exe"
+FEEDBACK_URL = "https://github.com/kaiiii777/pic_shuiyin/issues/new"
 
 
 class WatermarkItem:
@@ -108,27 +110,28 @@ class WatermarkApp:
                 pass
 
     def configure_theme(self):
-        self.root.configure(bg="#F6F8FA")
+        self.root.configure(bg="#FFFFFF")
         style = ttk.Style()
-        try:
-            style.theme_use("clam")
-        except tk.TclError:
-            pass
+        for theme in ("vista", "xpnative", "winnative", "default"):
+            try:
+                style.theme_use(theme)
+                break
+            except tk.TclError:
+                continue
 
-        style.configure(".", font=("Microsoft YaHei UI", 9), background="#F6F8FA", foreground="#17202A")
-        style.configure("TFrame", background="#F6F8FA")
-        style.configure("TLabelframe", background="#F6F8FA", bordercolor="#D7DEE8", relief="solid")
-        style.configure("TLabelframe.Label", background="#F6F8FA", foreground="#0F172A", font=("Microsoft YaHei UI", 9, "bold"))
-        style.configure("TLabel", background="#F6F8FA", foreground="#334155")
-        style.configure("TCheckbutton", background="#F6F8FA", foreground="#334155")
-        style.configure("TRadiobutton", background="#F6F8FA", foreground="#334155")
-        style.configure("TEntry", fieldbackground="#FFFFFF", bordercolor="#CBD5E1", lightcolor="#CBD5E1", darkcolor="#CBD5E1")
-        style.configure("TCombobox", fieldbackground="#FFFFFF", bordercolor="#CBD5E1")
-        style.configure("TButton", padding=(10, 5), background="#E8F3F6", foreground="#0F4C5C", bordercolor="#A8DADC")
-        style.map("TButton", background=[("active", "#D6EEF3")], foreground=[("active", "#0F4C5C")])
-        style.configure("Accent.TButton", padding=(14, 6), background="#0891B2", foreground="#FFFFFF", bordercolor="#0891B2")
-        style.map("Accent.TButton", background=[("active", "#0E7490")], foreground=[("active", "#FFFFFF")])
-        style.configure("Horizontal.TProgressbar", troughcolor="#E2E8F0", background="#0891B2")
+        font = ("Microsoft YaHei UI", 9)
+        heading_font = ("Microsoft YaHei UI", 9, "bold")
+        style.configure(".", font=font, background="#FFFFFF", foreground="#111827")
+        style.configure("TFrame", background="#FFFFFF")
+        style.configure("TLabelframe", background="#FFFFFF")
+        style.configure("TLabelframe.Label", background="#FFFFFF", foreground="#111827", font=heading_font)
+        style.configure("TLabel", background="#FFFFFF", foreground="#1F2937")
+        style.configure("TCheckbutton", background="#FFFFFF", foreground="#1F2937")
+        style.configure("TRadiobutton", background="#FFFFFF", foreground="#1F2937")
+        style.configure("TButton", padding=(10, 5))
+        style.configure("Accent.TButton", padding=(16, 6), foreground="#FFFFFF")
+        style.map("Accent.TButton", foreground=[("active", "#FFFFFF")])
+        style.configure("Horizontal.TProgressbar", background="#2563EB")
 
     def create_ui(self):
         main_frame = ttk.Frame(self.root, padding="10")
@@ -137,6 +140,11 @@ class WatermarkApp:
         # ===== 顶部 =====
         top_frame = ttk.Frame(main_frame)
         top_frame.pack(fill=tk.X, pady=3)
+
+        utility_frame = ttk.Frame(top_frame)
+        utility_frame.pack(side=tk.RIGHT)
+        ttk.Button(utility_frame, text="检查更新", command=lambda: self.start_update_check(False)).pack(side=tk.LEFT, padx=(4, 2))
+        ttk.Button(utility_frame, text="意见反馈", command=self.open_feedback).pack(side=tk.LEFT, padx=(2, 4))
 
         ttk.Label(top_frame, text="源图片:").pack(side=tk.LEFT, padx=5)
         ttk.Button(top_frame, text="选择图片", command=self.select_images).pack(side=tk.LEFT, padx=2)
@@ -344,7 +352,6 @@ class WatermarkApp:
         action_frame = ttk.Frame(bottom_frame)
         action_frame.pack(pady=3)
         ttk.Button(action_frame, text="开始处理", command=self.start_processing, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
-        ttk.Button(action_frame, text="检查更新", command=lambda: self.start_update_check(False)).pack(side=tk.LEFT, padx=5)
 
         self.update_watermark_list()
 
@@ -767,6 +774,12 @@ class WatermarkApp:
         if getattr(sys, "frozen", False):
             return sys.executable
         return os.path.abspath(__file__)
+
+    def open_feedback(self):
+        try:
+            webbrowser.open(FEEDBACK_URL)
+        except Exception as e:
+            messagebox.showerror("意见反馈", f"无法打开反馈页面：{e}")
 
     def start_auto_update_check(self):
         self.start_update_check(True)
