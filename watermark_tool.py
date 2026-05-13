@@ -16,7 +16,7 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 
 
-APP_VERSION = "1.0.11"
+APP_VERSION = "1.0.12"
 UPDATE_API_URL = "https://api.github.com/repos/kaiiii777/pic_shuiyin/releases/latest"
 UPDATE_ASSET_NAME = "图片水印工具.exe"
 
@@ -36,6 +36,7 @@ class WatermarkApp:
         self.root = root
         self.root.title(f"图片处理工具 {APP_VERSION}")
         self.root.geometry("1200x850")
+        self.root.minsize(1080, 760)
 
         self.watermarks = []
         self.source_images = []
@@ -108,7 +109,7 @@ class WatermarkApp:
                 pass
 
     def configure_theme(self):
-        self.root.configure(bg="#FFFFFF")
+        self.root.configure(bg="#F8FAFC")
         style = ttk.Style()
         for theme in ("vista", "xpnative", "winnative", "default"):
             try:
@@ -119,120 +120,24 @@ class WatermarkApp:
 
         font = ("Microsoft YaHei UI", 9)
         heading_font = ("Microsoft YaHei UI", 9, "bold")
-        style.configure(".", font=font, background="#FFFFFF", foreground="#111827")
-        style.configure("TFrame", background="#FFFFFF")
-        style.configure("TLabelframe", background="#FFFFFF")
-        style.configure("TLabelframe.Label", background="#FFFFFF", foreground="#111827", font=heading_font)
-        style.configure("TLabel", background="#FFFFFF", foreground="#1F2937")
-        style.configure("TCheckbutton", background="#FFFFFF", foreground="#1F2937")
-        style.configure("TRadiobutton", background="#FFFFFF", foreground="#1F2937")
+        style.configure(".", font=font, background="#F8FAFC", foreground="#111827")
+        style.configure("TFrame", background="#F8FAFC")
+        style.configure("TLabelframe", background="#F8FAFC")
+        style.configure("TLabelframe.Label", background="#F8FAFC", foreground="#111827", font=heading_font)
+        style.configure("TLabel", background="#F8FAFC", foreground="#1F2937")
+        style.configure("Muted.TLabel", background="#F8FAFC", foreground="#64748B")
+        style.configure("Status.TLabel", background="#F8FAFC", foreground="#0F766E", font=heading_font)
+        style.configure("TCheckbutton", background="#F8FAFC", foreground="#1F2937")
+        style.configure("TRadiobutton", background="#F8FAFC", foreground="#1F2937")
         style.configure("TButton", padding=(10, 5))
-        style.configure("Accent.TButton", padding=(16, 6), foreground="#FFFFFF")
-        style.map("Accent.TButton", foreground=[("active", "#FFFFFF")])
-        style.configure("Horizontal.TProgressbar", background="#2563EB")
+        style.configure("Accent.TButton", padding=(16, 6), foreground="#111827")
+        style.configure("Horizontal.TProgressbar", background="#0D9488", troughcolor="#E2E8F0")
 
     def create_ui(self):
-        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame = ttk.Frame(self.root, padding="12")
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # ===== 顶部 =====
-        top_frame = ttk.Frame(main_frame)
-        top_frame.pack(fill=tk.X, pady=3)
-
-        utility_frame = ttk.Frame(top_frame)
-        utility_frame.pack(side=tk.RIGHT)
-        ttk.Button(utility_frame, text="检查更新", command=lambda: self.start_update_check(False)).pack(side=tk.LEFT, padx=(4, 2))
-
-        ttk.Label(top_frame, text="源图片:").pack(side=tk.LEFT, padx=5)
-        ttk.Button(top_frame, text="选择图片", command=self.select_images).pack(side=tk.LEFT, padx=2)
-        ttk.Button(top_frame, text="选择文件夹", command=self.select_folder).pack(side=tk.LEFT, padx=2)
-        self.source_count_label = ttk.Label(top_frame, text="已选择: 0 张图片")
-        self.source_count_label.pack(side=tk.LEFT, padx=10)
-        ttk.Checkbutton(
-            top_frame,
-            text="处理子文件夹",
-            variable=self.recursive_folders
-        ).pack(side=tk.LEFT, padx=5)
-
-        ttk.Label(top_frame, text="输出:").pack(side=tk.LEFT, padx=20)
-        ttk.Entry(top_frame, textvariable=self.output_dir, width=25).pack(side=tk.LEFT, padx=2)
-        ttk.Button(top_frame, text="浏览", command=self.select_output_dir).pack(side=tk.LEFT, padx=2)
-
-        filename_frame = ttk.LabelFrame(main_frame, text="导出文件名", padding="5")
-        filename_frame.pack(fill=tk.X, pady=3)
-
-        ttk.Label(filename_frame, text="前缀:").pack(side=tk.LEFT, padx=(5, 2))
-        ttk.Entry(filename_frame, textvariable=self.output_prefix, width=16).pack(side=tk.LEFT, padx=2)
-        ttk.Label(filename_frame, text="后缀:").pack(side=tk.LEFT, padx=(12, 2))
-        ttk.Entry(filename_frame, textvariable=self.output_suffix, width=16).pack(side=tk.LEFT, padx=2)
-        ttk.Checkbutton(
-            filename_frame,
-            text="按原文件名导出（忽略前缀/后缀）",
-            variable=self.use_original_name
-        ).pack(side=tk.LEFT, padx=(12, 4))
-        ttk.Checkbutton(
-            filename_frame,
-            text="覆盖原文件",
-            variable=self.overwrite_original
-        ).pack(side=tk.LEFT, padx=8)
-
-        crop_frame = ttk.LabelFrame(main_frame, text="图片裁切", padding="5")
-        crop_frame.pack(fill=tk.X, pady=3)
-
-        ttk.Checkbutton(
-            crop_frame,
-            text="启用裁切",
-            variable=self.enable_crop,
-            command=self.update_preview
-        ).pack(side=tk.LEFT, padx=(5, 12))
-        ttk.Label(crop_frame, text="目标比例:").pack(side=tk.LEFT, padx=(0, 2))
-        ratio_box = ttk.Combobox(
-            crop_frame,
-            values=("1:1", "4:3", "3:4", "16:9", "9:16"),
-            width=8,
-            state="readonly"
-        )
-        ratio_box.set("1:1")
-        ratio_box.pack(side=tk.LEFT, padx=2)
-        ratio_box.bind("<<ComboboxSelected>>", lambda e: self.set_crop_ratio(ratio_box.get()))
-        ttk.Entry(crop_frame, textvariable=self.crop_ratio_w, width=6).pack(side=tk.LEFT, padx=(12, 2))
-        ttk.Label(crop_frame, text=":").pack(side=tk.LEFT)
-        ttk.Entry(crop_frame, textvariable=self.crop_ratio_h, width=6).pack(side=tk.LEFT, padx=2)
-        ttk.Button(crop_frame, text="应用比例", command=self.update_preview).pack(side=tk.LEFT, padx=8)
-
-        resize_frame = ttk.LabelFrame(main_frame, text="尺寸修改", padding="8")
-        resize_frame.pack(fill=tk.X, pady=3)
-
-        ttk.Checkbutton(
-            resize_frame,
-            text="启用尺寸修改",
-            variable=self.enable_resize,
-            command=self.update_preview
-        ).grid(row=0, column=0, sticky=tk.W, padx=(4, 12), pady=3)
-        ttk.Label(resize_frame, text="目标宽度:").grid(row=0, column=1, sticky=tk.E, padx=(8, 4), pady=3)
-        ttk.Spinbox(resize_frame, from_=1, to=20000, textvariable=self.resize_width, width=8, command=self.update_preview).grid(row=0, column=2, sticky=tk.W, pady=3)
-        ttk.Label(resize_frame, text="目标高度:").grid(row=0, column=3, sticky=tk.E, padx=(14, 4), pady=3)
-        ttk.Spinbox(resize_frame, from_=1, to=20000, textvariable=self.resize_height, width=8, command=self.update_preview).grid(row=0, column=4, sticky=tk.W, pady=3)
-
-        ttk.Label(resize_frame, text="缩放模式:").grid(row=1, column=0, sticky=tk.W, padx=4, pady=3)
-        ttk.Radiobutton(resize_frame, text="留白适配", variable=self.resize_mode, value="fit", command=self.update_preview).grid(row=1, column=1, sticky=tk.W, pady=3)
-        ttk.Radiobutton(resize_frame, text="裁剪填充", variable=self.resize_mode, value="fill", command=self.update_preview).grid(row=1, column=2, sticky=tk.W, pady=3)
-        ttk.Radiobutton(resize_frame, text="拉伸填充", variable=self.resize_mode, value="stretch", command=self.update_preview).grid(row=1, column=3, sticky=tk.W, pady=3)
-
-        ttk.Label(resize_frame, text="白边颜色:").grid(row=2, column=0, sticky=tk.W, padx=4, pady=3)
-        ttk.Combobox(
-            resize_frame,
-            textvariable=self.resize_bg_color,
-            values=("white", "black", "#f5f5f5", "#ffffff"),
-            width=12
-        ).grid(row=2, column=1, sticky=tk.W, pady=3)
-        ttk.Label(resize_frame, text="仅留白适配有效").grid(row=2, column=2, columnspan=2, sticky=tk.W, padx=8, pady=3)
-
-        ttk.Label(
-            resize_frame,
-            text="输出命名在“导出文件名”中统一设置。"
-        ).grid(row=3, column=0, columnspan=4, sticky=tk.W, padx=4, pady=(6, 3))
-
+        self.create_batch_settings(main_frame)
         self.create_processing_bar(main_frame)
 
         # ===== 中部 =====
@@ -327,7 +232,7 @@ class WatermarkApp:
         right_frame = ttk.LabelFrame(middle_frame, text="预览 (拖动水印移动, 拖动裁切框调整位置)", padding="5")
         right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        self.canvas = tk.Canvas(right_frame, bg='#555555', width=650, height=500)
+        self.canvas = tk.Canvas(right_frame, bg='#555555', width=525, height=420)
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.canvas.bind('<Button-1>', self.on_canvas_click)
         self.canvas.bind('<B1-Motion>', self.on_canvas_drag)
@@ -341,25 +246,144 @@ class WatermarkApp:
 
         self.update_watermark_list()
 
-    def create_processing_bar(self, parent):
-        processing_frame = ttk.LabelFrame(parent, text="处理进度", padding="8")
-        processing_frame.pack(fill=tk.X, pady=3)
+    def create_batch_settings(self, parent):
+        header_frame = ttk.Frame(parent)
+        header_frame.pack(fill=tk.X, pady=(0, 6))
 
-        action_frame = ttk.Frame(processing_frame)
-        action_frame.pack(fill=tk.X)
-
-        self.status_label = ttk.Label(action_frame, text="就绪")
-        self.status_label.pack(side=tk.LEFT)
-
+        ttk.Label(header_frame, text="批处理设置", font=("Microsoft YaHei UI", 10, "bold")).pack(side=tk.LEFT)
         ttk.Button(
-            action_frame,
-            text="开始处理",
-            command=self.start_processing,
-            style="Accent.TButton"
-        ).pack(side=tk.RIGHT, padx=(10, 0))
+            header_frame,
+            text="检查更新",
+            command=lambda: self.start_update_check(False)
+        ).pack(side=tk.RIGHT)
+
+        settings_frame = ttk.Frame(parent)
+        settings_frame.pack(fill=tk.X, pady=(0, 6))
+        settings_frame.columnconfigure(0, weight=3)
+        settings_frame.columnconfigure(1, weight=2)
+
+        input_frame = ttk.LabelFrame(settings_frame, text="输入与输出", padding=(10, 8))
+        input_frame.grid(row=0, column=0, sticky=tk.NSEW, padx=(0, 6))
+        input_frame.columnconfigure(3, weight=1)
+
+        ttk.Label(input_frame, text="源图片").grid(row=0, column=0, sticky=tk.W, padx=(0, 8), pady=3)
+        ttk.Button(input_frame, text="选择图片", command=self.select_images).grid(row=0, column=1, sticky=tk.W, padx=(0, 4), pady=3)
+        ttk.Button(input_frame, text="选择文件夹", command=self.select_folder).grid(row=0, column=2, sticky=tk.W, padx=(0, 8), pady=3)
+        self.source_count_label = ttk.Label(input_frame, text="已选择: 0 张图片", style="Muted.TLabel")
+        self.source_count_label.grid(row=0, column=3, sticky=tk.W, pady=3)
+        ttk.Checkbutton(
+            input_frame,
+            text="处理子文件夹",
+            variable=self.recursive_folders
+        ).grid(row=0, column=4, sticky=tk.E, padx=(8, 0), pady=3)
+
+        ttk.Label(input_frame, text="输出目录").grid(row=1, column=0, sticky=tk.W, padx=(0, 8), pady=3)
+        ttk.Entry(input_frame, textvariable=self.output_dir, width=34).grid(row=1, column=1, columnspan=3, sticky=tk.EW, padx=(0, 4), pady=3)
+        ttk.Button(input_frame, text="浏览", command=self.select_output_dir).grid(row=1, column=4, sticky=tk.E, pady=3)
+
+        option_tabs = ttk.Notebook(settings_frame)
+        option_tabs.grid(row=0, column=1, sticky=tk.NSEW, padx=(6, 0))
+
+        filename_frame = ttk.Frame(option_tabs, padding=(10, 8))
+        option_tabs.add(filename_frame, text="导出")
+        filename_frame.columnconfigure(1, weight=1)
+        filename_frame.columnconfigure(3, weight=1)
+
+        ttk.Label(filename_frame, text="前缀").grid(row=0, column=0, sticky=tk.W, padx=(0, 6), pady=3)
+        ttk.Entry(filename_frame, textvariable=self.output_prefix, width=14).grid(row=0, column=1, sticky=tk.EW, padx=(0, 10), pady=3)
+        ttk.Label(filename_frame, text="后缀").grid(row=0, column=2, sticky=tk.W, padx=(0, 6), pady=3)
+        ttk.Entry(filename_frame, textvariable=self.output_suffix, width=14).grid(row=0, column=3, sticky=tk.EW, pady=3)
+        ttk.Checkbutton(
+            filename_frame,
+            text="按原文件名导出",
+            variable=self.use_original_name
+        ).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
+        ttk.Checkbutton(
+            filename_frame,
+            text="覆盖原文件",
+            variable=self.overwrite_original
+        ).grid(row=1, column=2, columnspan=2, sticky=tk.W, pady=(5, 0))
+
+        crop_frame = ttk.Frame(option_tabs, padding=(10, 8))
+        option_tabs.add(crop_frame, text="裁切")
+        crop_frame.columnconfigure(5, weight=1)
+
+        ttk.Checkbutton(
+            crop_frame,
+            text="启用裁切",
+            variable=self.enable_crop,
+            command=self.update_preview
+        ).grid(row=0, column=0, sticky=tk.W, padx=(0, 12), pady=3)
+        ttk.Label(crop_frame, text="目标比例").grid(row=0, column=1, sticky=tk.W, padx=(0, 6), pady=3)
+        ratio_box = ttk.Combobox(
+            crop_frame,
+            values=("1:1", "4:3", "3:4", "16:9", "9:16"),
+            width=8,
+            state="readonly"
+        )
+        ratio_box.set("1:1")
+        ratio_box.grid(row=0, column=2, sticky=tk.W, padx=(0, 10), pady=3)
+        ratio_box.bind("<<ComboboxSelected>>", lambda e: self.set_crop_ratio(ratio_box.get()))
+        ttk.Entry(crop_frame, textvariable=self.crop_ratio_w, width=6).grid(row=0, column=3, sticky=tk.W, pady=3)
+        ttk.Label(crop_frame, text=":").grid(row=0, column=4, padx=3, pady=3)
+        ttk.Entry(crop_frame, textvariable=self.crop_ratio_h, width=6).grid(row=0, column=5, sticky=tk.W, pady=3)
+        ttk.Button(crop_frame, text="应用比例", command=self.update_preview).grid(row=0, column=6, sticky=tk.E, padx=(10, 0), pady=3)
+
+        resize_frame = ttk.Frame(option_tabs, padding=(10, 8))
+        option_tabs.add(resize_frame, text="尺寸")
+        resize_frame.columnconfigure(4, weight=1)
+
+        ttk.Checkbutton(
+            resize_frame,
+            text="启用尺寸修改",
+            variable=self.enable_resize,
+            command=self.update_preview
+        ).grid(row=0, column=0, columnspan=2, sticky=tk.W, padx=(0, 10), pady=3)
+        ttk.Label(resize_frame, text="宽").grid(row=0, column=2, sticky=tk.E, padx=(0, 4), pady=3)
+        ttk.Spinbox(resize_frame, from_=1, to=20000, textvariable=self.resize_width, width=8, command=self.update_preview).grid(row=0, column=3, sticky=tk.W, pady=3)
+        ttk.Label(resize_frame, text="高").grid(row=0, column=4, sticky=tk.E, padx=(10, 4), pady=3)
+        ttk.Spinbox(resize_frame, from_=1, to=20000, textvariable=self.resize_height, width=8, command=self.update_preview).grid(row=0, column=5, sticky=tk.W, pady=3)
+
+        ttk.Label(resize_frame, text="缩放模式").grid(row=1, column=0, sticky=tk.W, pady=3)
+        ttk.Radiobutton(resize_frame, text="留白适配", variable=self.resize_mode, value="fit", command=self.update_preview).grid(row=1, column=1, sticky=tk.W, pady=3)
+        ttk.Radiobutton(resize_frame, text="裁剪填充", variable=self.resize_mode, value="fill", command=self.update_preview).grid(row=1, column=2, columnspan=2, sticky=tk.W, pady=3)
+        ttk.Radiobutton(resize_frame, text="拉伸填充", variable=self.resize_mode, value="stretch", command=self.update_preview).grid(row=1, column=4, columnspan=2, sticky=tk.W, pady=3)
+
+        ttk.Label(resize_frame, text="白边颜色").grid(row=2, column=0, sticky=tk.W, pady=3)
+        ttk.Combobox(
+            resize_frame,
+            textvariable=self.resize_bg_color,
+            values=("white", "black", "#f5f5f5", "#ffffff"),
+            width=12
+        ).grid(row=2, column=1, columnspan=2, sticky=tk.W, pady=3)
+        ttk.Label(resize_frame, text="仅留白适配有效", style="Muted.TLabel").grid(row=2, column=3, columnspan=3, sticky=tk.W, padx=(10, 0), pady=3)
+
+    def create_processing_bar(self, parent):
+        processing_frame = ttk.LabelFrame(parent, text="处理进度", padding=(10, 8))
+        processing_frame.pack(fill=tk.X, pady=(0, 8))
+        processing_frame.columnconfigure(1, weight=1)
+
+        self.status_label = ttk.Label(processing_frame, text="就绪", style="Status.TLabel", width=14)
+        self.status_label.grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
 
         self.progress = ttk.Progressbar(processing_frame, mode='determinate')
-        self.progress.pack(fill=tk.X, pady=(8, 0))
+        self.progress.grid(row=0, column=1, sticky=tk.EW, padx=(0, 12))
+
+        tk.Button(
+            processing_frame,
+            text="开始处理",
+            command=self.start_processing,
+            bg="#EA580C",
+            fg="#FFFFFF",
+            activebackground="#C2410C",
+            activeforeground="#FFFFFF",
+            relief=tk.FLAT,
+            bd=0,
+            cursor="hand2",
+            font=("Microsoft YaHei UI", 10, "bold"),
+            padx=18,
+            pady=7
+        ).grid(row=0, column=2, sticky=tk.E)
 
     def add_watermark(self):
         # 先保存当前编辑框的内容到当前选中水印（如果有内容）
