@@ -16,7 +16,7 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 
 
-APP_VERSION = "1.0.7"
+APP_VERSION = "1.0.8"
 UPDATE_API_URL = "https://api.github.com/repos/kaiiii777/pic_shuiyin/releases/latest"
 UPDATE_ASSET_NAME = "图片水印工具.exe"
 
@@ -142,6 +142,7 @@ class WatermarkApp:
         utility_frame = ttk.Frame(top_frame)
         utility_frame.pack(side=tk.RIGHT)
         ttk.Button(utility_frame, text="检查更新", command=lambda: self.start_update_check(False)).pack(side=tk.LEFT, padx=(4, 2))
+        ttk.Button(utility_frame, text="导出图片", command=self.start_processing, style="Accent.TButton").pack(side=tk.LEFT, padx=(8, 2))
 
         ttk.Label(top_frame, text="源图片:").pack(side=tk.LEFT, padx=5)
         ttk.Button(top_frame, text="选择图片", command=self.select_images).pack(side=tk.LEFT, padx=2)
@@ -348,7 +349,7 @@ class WatermarkApp:
 
         action_frame = ttk.Frame(bottom_frame)
         action_frame.pack(pady=3)
-        ttk.Button(action_frame, text="开始处理", command=self.start_processing, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
+        ttk.Button(action_frame, text="导出图片", command=self.start_processing, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
 
         self.update_watermark_list()
 
