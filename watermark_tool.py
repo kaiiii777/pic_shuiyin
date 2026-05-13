@@ -17,9 +17,10 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 
 
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 UPDATE_API_URL = "https://api.github.com/repos/kaiiii777/pic_shuiyin/releases/latest"
 UPDATE_ASSET_NAME = "图片水印工具.exe"
+FEEDBACK_CONFIG_FILE = "feedback_config.json"
 
 
 class WatermarkItem:
@@ -779,6 +780,16 @@ class WatermarkApp:
             return os.path.dirname(sys.executable)
         return os.path.dirname(os.path.abspath(__file__))
 
+    def load_feedback_config(self):
+        config_path = os.path.join(self.get_app_dir(), FEEDBACK_CONFIG_FILE)
+        if not os.path.exists(config_path):
+            return {}
+        try:
+            with open(config_path, "r", encoding="utf-8") as file:
+                return json.load(file)
+        except Exception:
+            return {}
+
     def open_feedback(self):
         dialog = tk.Toplevel(self.root)
         dialog.title("意见反馈")
@@ -807,24 +818,58 @@ class WatermarkApp:
                 messagebox.showwarning("意见反馈", "请先填写反馈内容。", parent=dialog)
                 return
 
-            feedback_dir = os.path.join(self.get_app_dir(), "feedback")
-            os.makedirs(feedback_dir, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            feedback_path = os.path.join(feedback_dir, f"feedback_{timestamp}.txt")
-            with open(feedback_path, "w", encoding="utf-8") as file:
-                file.write(f"版本: {APP_VERSION}\n")
-                file.write(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                if contact:
-                    file.write(f"联系方式: {contact}\n")
-                file.write("\n反馈内容:\n")
-                file.write(content)
-                file.write("\n")
+            payload = {
+                "version": APP_VERSION,
+                "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "contact": contact,
+                "content": content,
+            }
 
-            dialog.destroy()
-            messagebox.showinfo("意见反馈", f"反馈已保存到：\n{feedback_path}")
+            try:
+                self.submit_feedback(payload)
+                dialog.destroy()
+                messagebox.showinfo("意见反馈", "反馈已提交，感谢你的建议。")
+            except Exception as e:
+                backup_path = self.save_feedback_backup(payload)
+                dialog.destroy()
+                messagebox.showwarning(
+                    "意见反馈",
+                    f"反馈提交失败，已保存本地备份：\n{backup_path}\n\n原因：{e}"
+                )
 
         ttk.Button(button_frame, text="取消", command=dialog.destroy).pack(side=tk.RIGHT, padx=(6, 0))
-        ttk.Button(button_frame, text="保存反馈", command=save_feedback, style="Accent.TButton").pack(side=tk.RIGHT)
+        ttk.Button(button_frame, text="提交反馈", command=save_feedback, style="Accent.TButton").pack(side=tk.RIGHT)
+
+    def submit_feedback(self, payload):
+        config = self.load_feedback_config()
+        endpoint = config.get("endpoint", "").strip()
+        if not endpoint:
+            raise RuntimeError(f"未配置反馈接收地址，请在 {FEEDBACK_CONFIG_FILE} 中设置 endpoint")
+
+        headers = {"Content-Type": "application/json; charset=utf-8"}
+        for key, value in config.get("headers", {}).items():
+            headers[str(key)] = str(value)
+
+        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        request = urllib.request.Request(endpoint, data=data, headers=headers, method="POST")
+        with urllib.request.urlopen(request, timeout=15) as response:
+            if response.status >= 400:
+                raise RuntimeError(f"HTTP {response.status}")
+
+    def save_feedback_backup(self, payload):
+        feedback_dir = os.path.join(self.get_app_dir(), "feedback")
+        os.makedirs(feedback_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        feedback_path = os.path.join(feedback_dir, f"feedback_{timestamp}.txt")
+        with open(feedback_path, "w", encoding="utf-8") as file:
+            file.write(f"版本: {payload.get('version', APP_VERSION)}\n")
+            file.write(f"时间: {payload.get('time', '')}\n")
+            if payload.get("contact"):
+                file.write(f"联系方式: {payload['contact']}\n")
+            file.write("\n反馈内容:\n")
+            file.write(payload.get("content", ""))
+            file.write("\n")
+        return feedback_path
 
     def start_auto_update_check(self):
         self.start_update_check(True)
