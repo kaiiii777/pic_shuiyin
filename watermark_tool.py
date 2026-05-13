@@ -16,7 +16,7 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 
 
-APP_VERSION = "1.0.9"
+APP_VERSION = "1.0.10"
 UPDATE_API_URL = "https://api.github.com/repos/kaiiii777/pic_shuiyin/releases/latest"
 UPDATE_ASSET_NAME = "图片水印工具.exe"
 
@@ -932,16 +932,22 @@ class WatermarkApp:
 
     def launch_updater(self, new_exe_path, current_exe):
         updater_path = os.path.join(os.path.dirname(new_exe_path), "update.bat")
+        current_dir = os.path.dirname(current_exe)
         script = f"""@echo off
 chcp 65001 >nul
-timeout /t 1 /nobreak >nul
+set _PYI_APPLICATION_HOME_DIR=
+set _PYI_ARCHIVE_FILE=
+set _PYI_PARENT_PROCESS_LEVEL=
+set _PYI_SPLASH_IPC=
+timeout /t 2 /nobreak >nul
 :wait_loop
 copy /y "{new_exe_path}" "{current_exe}" >nul
 if errorlevel 1 (
   timeout /t 1 /nobreak >nul
   goto wait_loop
 )
-start "" "{current_exe}"
+timeout /t 1 /nobreak >nul
+start "" /d "{current_dir}" "{current_exe}"
 del "%~f0"
 """
         with open(updater_path, "w", encoding="utf-8") as file:
