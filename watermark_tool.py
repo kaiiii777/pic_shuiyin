@@ -10,7 +10,7 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
-import webbrowser
+from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageTk
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -20,7 +20,6 @@ import threading
 APP_VERSION = "1.0.4"
 UPDATE_API_URL = "https://api.github.com/repos/kaiiii777/pic_shuiyin/releases/latest"
 UPDATE_ASSET_NAME = "图片水印工具.exe"
-FEEDBACK_URL = "https://github.com/kaiiii777/pic_shuiyin/issues/new"
 
 
 class WatermarkItem:
@@ -36,7 +35,7 @@ class WatermarkItem:
 class WatermarkApp:
     def __init__(self, root):
         self.root = root
-        self.root.title(f"批量图片水印工具 v8 - {APP_VERSION}")
+        self.root.title(f"图片处理工具 {APP_VERSION}")
         self.root.geometry("1200x850")
 
         self.watermarks = []
@@ -775,11 +774,57 @@ class WatermarkApp:
             return sys.executable
         return os.path.abspath(__file__)
 
+    def get_app_dir(self):
+        if getattr(sys, "frozen", False):
+            return os.path.dirname(sys.executable)
+        return os.path.dirname(os.path.abspath(__file__))
+
     def open_feedback(self):
-        try:
-            webbrowser.open(FEEDBACK_URL)
-        except Exception as e:
-            messagebox.showerror("意见反馈", f"无法打开反馈页面：{e}")
+        dialog = tk.Toplevel(self.root)
+        dialog.title("意见反馈")
+        dialog.geometry("520x380")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        frame = ttk.Frame(dialog, padding="14")
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(frame, text="反馈内容").pack(anchor=tk.W)
+        feedback_text = tk.Text(frame, height=10, wrap=tk.WORD, relief=tk.SOLID, borderwidth=1)
+        feedback_text.pack(fill=tk.BOTH, expand=True, pady=(6, 10))
+
+        ttk.Label(frame, text="联系方式（可选）").pack(anchor=tk.W)
+        contact_var = tk.StringVar()
+        ttk.Entry(frame, textvariable=contact_var).pack(fill=tk.X, pady=(6, 12))
+
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(fill=tk.X)
+
+        def save_feedback():
+            content = feedback_text.get("1.0", tk.END).strip()
+            contact = contact_var.get().strip()
+            if not content:
+                messagebox.showwarning("意见反馈", "请先填写反馈内容。", parent=dialog)
+                return
+
+            feedback_dir = os.path.join(self.get_app_dir(), "feedback")
+            os.makedirs(feedback_dir, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            feedback_path = os.path.join(feedback_dir, f"feedback_{timestamp}.txt")
+            with open(feedback_path, "w", encoding="utf-8") as file:
+                file.write(f"版本: {APP_VERSION}\n")
+                file.write(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                if contact:
+                    file.write(f"联系方式: {contact}\n")
+                file.write("\n反馈内容:\n")
+                file.write(content)
+                file.write("\n")
+
+            dialog.destroy()
+            messagebox.showinfo("意见反馈", f"反馈已保存到：\n{feedback_path}")
+
+        ttk.Button(button_frame, text="取消", command=dialog.destroy).pack(side=tk.RIGHT, padx=(6, 0))
+        ttk.Button(button_frame, text="保存反馈", command=save_feedback, style="Accent.TButton").pack(side=tk.RIGHT)
 
     def start_auto_update_check(self):
         self.start_update_check(True)
