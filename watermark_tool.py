@@ -16,7 +16,7 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 
 
-APP_VERSION = "1.0.10"
+APP_VERSION = "1.0.11"
 UPDATE_API_URL = "https://api.github.com/repos/kaiiii777/pic_shuiyin/releases/latest"
 UPDATE_ASSET_NAME = "图片水印工具.exe"
 
@@ -233,6 +233,8 @@ class WatermarkApp:
             text="输出命名在“导出文件名”中统一设置。"
         ).grid(row=3, column=0, columnspan=4, sticky=tk.W, padx=4, pady=(6, 3))
 
+        self.create_processing_bar(main_frame)
+
         # ===== 中部 =====
         middle_frame = ttk.Frame(main_frame)
         middle_frame.pack(fill=tk.BOTH, expand=True, pady=3)
@@ -337,11 +339,13 @@ class WatermarkApp:
         self.preview_info.pack(side=tk.LEFT)
         ttk.Button(info_frame, text="刷新", command=self.update_preview).pack(side=tk.RIGHT)
 
-        # ===== 底部 =====
-        bottom_frame = ttk.LabelFrame(main_frame, text="处理进度", padding="8")
-        bottom_frame.pack(fill=tk.X, pady=3)
+        self.update_watermark_list()
 
-        action_frame = ttk.Frame(bottom_frame)
+    def create_processing_bar(self, parent):
+        processing_frame = ttk.LabelFrame(parent, text="处理进度", padding="8")
+        processing_frame.pack(fill=tk.X, pady=3)
+
+        action_frame = ttk.Frame(processing_frame)
         action_frame.pack(fill=tk.X)
 
         self.status_label = ttk.Label(action_frame, text="就绪")
@@ -354,10 +358,8 @@ class WatermarkApp:
             style="Accent.TButton"
         ).pack(side=tk.RIGHT, padx=(10, 0))
 
-        self.progress = ttk.Progressbar(bottom_frame, mode='determinate')
+        self.progress = ttk.Progressbar(processing_frame, mode='determinate')
         self.progress.pack(fill=tk.X, pady=(8, 0))
-
-        self.update_watermark_list()
 
     def add_watermark(self):
         # 先保存当前编辑框的内容到当前选中水印（如果有内容）
