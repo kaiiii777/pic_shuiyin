@@ -2,9 +2,7 @@
 批量图片水印工具 v8
 支持水印缩放控制框、四角拖动独立拉伸
 """
-import base64
 import hashlib
-import hmac
 import json
 import os
 import subprocess
@@ -12,17 +10,15 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
-from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageOps, ImageTk
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import threading
 
 
-APP_VERSION = "1.0.6"
+APP_VERSION = "1.0.7"
 UPDATE_API_URL = "https://api.github.com/repos/kaiiii777/pic_shuiyin/releases/latest"
 UPDATE_ASSET_NAME = "图片水印工具.exe"
-FEEDBACK_CONFIG_FILE = "feedback_config.json"
 
 
 class WatermarkItem:
@@ -146,7 +142,6 @@ class WatermarkApp:
         utility_frame = ttk.Frame(top_frame)
         utility_frame.pack(side=tk.RIGHT)
         ttk.Button(utility_frame, text="检查更新", command=lambda: self.start_update_check(False)).pack(side=tk.LEFT, padx=(4, 2))
-        ttk.Button(utility_frame, text="意见反馈", command=self.open_feedback).pack(side=tk.LEFT, padx=(2, 4))
 
         ttk.Label(top_frame, text="源图片:").pack(side=tk.LEFT, padx=5)
         ttk.Button(top_frame, text="选择图片", command=self.select_images).pack(side=tk.LEFT, padx=2)
@@ -781,141 +776,6 @@ class WatermarkApp:
         if getattr(sys, "frozen", False):
             return os.path.dirname(sys.executable)
         return os.path.dirname(os.path.abspath(__file__))
-
-    def load_feedback_config(self):
-        config_path = os.path.join(self.get_app_dir(), FEEDBACK_CONFIG_FILE)
-        if not os.path.exists(config_path):
-            return {}
-        try:
-            with open(config_path, "r", encoding="utf-8") as file:
-                return json.load(file)
-        except Exception:
-            return {}
-
-    def open_feedback(self):
-        dialog = tk.Toplevel(self.root)
-        dialog.title("意见反馈")
-        dialog.geometry("520x380")
-        dialog.transient(self.root)
-        dialog.grab_set()
-
-        frame = ttk.Frame(dialog, padding="14")
-        frame.pack(fill=tk.BOTH, expand=True)
-
-        ttk.Label(frame, text="反馈内容").pack(anchor=tk.W)
-        feedback_text = tk.Text(frame, height=10, wrap=tk.WORD, relief=tk.SOLID, borderwidth=1)
-        feedback_text.pack(fill=tk.BOTH, expand=True, pady=(6, 10))
-
-        ttk.Label(frame, text="联系方式（可选）").pack(anchor=tk.W)
-        contact_var = tk.StringVar()
-        ttk.Entry(frame, textvariable=contact_var).pack(fill=tk.X, pady=(6, 12))
-
-        button_frame = ttk.Frame(frame)
-        button_frame.pack(fill=tk.X)
-
-        def save_feedback():
-            content = feedback_text.get("1.0", tk.END).strip()
-            contact = contact_var.get().strip()
-            if not content:
-                messagebox.showwarning("意见反馈", "请先填写反馈内容。", parent=dialog)
-                return
-
-            payload = {
-                "version": APP_VERSION,
-                "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "contact": contact,
-                "content": content,
-            }
-
-            try:
-                self.submit_feedback(payload)
-                dialog.destroy()
-                messagebox.showinfo("意见反馈", "反馈已提交，感谢你的建议。")
-            except Exception as e:
-                backup_path = self.save_feedback_backup(payload)
-                dialog.destroy()
-                messagebox.showwarning(
-                    "意见反馈",
-                    f"反馈提交失败，已保存本地备份：\n{backup_path}\n\n原因：{e}"
-                )
-
-        ttk.Button(button_frame, text="取消", command=dialog.destroy).pack(side=tk.RIGHT, padx=(6, 0))
-        ttk.Button(button_frame, text="提交反馈", command=save_feedback, style="Accent.TButton").pack(side=tk.RIGHT)
-
-    def submit_feedback(self, payload):
-        config = self.load_feedback_config()
-        endpoint = config.get("endpoint", "").strip()
-        if not endpoint:
-            raise RuntimeError(f"未配置反馈接收地址，请在 {FEEDBACK_CONFIG_FILE} 中设置 endpoint")
-
-        if config.get("type", "feishu").lower() == "feishu":
-            self.submit_feishu_feedback(endpoint, payload, config.get("secret", "").strip())
-            return
-
-        headers = {"Content-Type": "application/json; charset=utf-8"}
-        for key, value in config.get("headers", {}).items():
-            headers[str(key)] = str(value)
-
-        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        request = urllib.request.Request(endpoint, data=data, headers=headers, method="POST")
-        with urllib.request.urlopen(request, timeout=15) as response:
-            if response.status >= 400:
-                raise RuntimeError(f"HTTP {response.status}")
-
-    def submit_feishu_feedback(self, endpoint, payload, secret=""):
-        text = (
-            f"图片处理工具用户反馈\n"
-            f"版本：{payload.get('version', APP_VERSION)}\n"
-            f"时间：{payload.get('time', '')}\n"
-            f"联系方式：{payload.get('contact') or '未填写'}\n\n"
-            f"{payload.get('content', '')}"
-        )
-        feishu_payload = {
-            "msg_type": "text",
-            "content": {"text": text},
-        }
-
-        if secret:
-            timestamp = str(int(datetime.now().timestamp()))
-            string_to_sign = f"{timestamp}\n{secret}"
-            sign = base64.b64encode(
-                hmac.new(string_to_sign.encode("utf-8"), digestmod=hashlib.sha256).digest()
-            ).decode("utf-8")
-            feishu_payload["timestamp"] = timestamp
-            feishu_payload["sign"] = sign
-
-        data = json.dumps(feishu_payload, ensure_ascii=False).encode("utf-8")
-        request = urllib.request.Request(
-            endpoint,
-            data=data,
-            headers={"Content-Type": "application/json; charset=utf-8"},
-            method="POST"
-        )
-        with urllib.request.urlopen(request, timeout=15) as response:
-            response_text = response.read().decode("utf-8", errors="ignore")
-            if response.status >= 400:
-                raise RuntimeError(f"HTTP {response.status}")
-            try:
-                result = json.loads(response_text)
-            except json.JSONDecodeError:
-                result = {}
-            if result.get("code") not in (None, 0):
-                raise RuntimeError(result.get("msg") or response_text or "飞书机器人返回错误")
-
-    def save_feedback_backup(self, payload):
-        feedback_dir = os.path.join(self.get_app_dir(), "feedback")
-        os.makedirs(feedback_dir, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        feedback_path = os.path.join(feedback_dir, f"feedback_{timestamp}.txt")
-        with open(feedback_path, "w", encoding="utf-8") as file:
-            file.write(f"版本: {payload.get('version', APP_VERSION)}\n")
-            file.write(f"时间: {payload.get('time', '')}\n")
-            if payload.get("contact"):
-                file.write(f"联系方式: {payload['contact']}\n")
-            file.write("\n反馈内容:\n")
-            file.write(payload.get("content", ""))
-            file.write("\n")
-        return feedback_path
 
     def start_auto_update_check(self):
         self.start_update_check(True)

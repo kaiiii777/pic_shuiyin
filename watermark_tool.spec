@@ -6,7 +6,7 @@ a = Analysis(
     ['watermark_tool.py'],
     pathex=[],
     binaries=[],
-    datas=[('assets/app_icon.ico', 'assets'), ('feedback_config.example.json', '.')],
+    datas=[('assets/app_icon.ico', 'assets')],
     hiddenimports=['PIL', 'tkinter'],
     hookspath=[],
     hooksconfig={},
