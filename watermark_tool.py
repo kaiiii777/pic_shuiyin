@@ -16,7 +16,7 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 
 
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 UPDATE_API_URL = "https://api.github.com/repos/kaiiii777/pic_shuiyin/releases/latest"
 UPDATE_ASSET_NAME = "图片水印工具.exe"
 
@@ -46,6 +46,7 @@ class WatermarkApp:
         self.output_prefix = tk.StringVar(value="")
         self.output_suffix = tk.StringVar(value="")
         self.use_original_name = tk.BooleanVar(value=False)
+        self.overwrite_original = tk.BooleanVar(value=False)
         self.recursive_folders = tk.BooleanVar(value=False)
         self.enable_crop = tk.BooleanVar(value=False)
         self.crop_ratio_w = tk.DoubleVar(value=1)
@@ -57,10 +58,6 @@ class WatermarkApp:
         self.resize_height = tk.IntVar(value=900)
         self.resize_mode = tk.StringVar(value="fit")
         self.resize_bg_color = tk.StringVar(value="white")
-        self.resize_filter_text = tk.StringVar(value="")
-        self.resize_filter_rule = tk.StringVar(value="contains")
-        self.resize_output_mode = tk.StringVar(value="suffix")
-        self.resize_suffix = tk.StringVar(value="_resized")
         self.opacity_text = tk.StringVar(value="100%")
         self.loading_watermark = False
         self.preview_photo = None
@@ -92,16 +89,50 @@ class WatermarkApp:
         # 控制点大小
         self.handle_size = 8
 
+        self.configure_theme()
+        self.set_window_icon()
         self.create_ui()
         self.add_watermark()
         self.root.after(1500, self.start_auto_update_check)
 
-    def create_ui(self):
-        main_frame = ttk.Frame(self.root, padding="5")
-        main_frame.pack(fill=tk.BOTH, expand=True)
+    def resource_path(self, relative_path):
+        base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(base_path, relative_path)
+
+    def set_window_icon(self):
+        icon_path = self.resource_path(os.path.join("assets", "app_icon.ico"))
+        if os.path.exists(icon_path):
+            try:
+                self.root.iconbitmap(icon_path)
+            except tk.TclError:
+                pass
+
+    def configure_theme(self):
+        self.root.configure(bg="#F6F8FA")
         style = ttk.Style()
-        style.configure("TLabelframe", padding=8)
-        style.configure("TButton", padding=(10, 4))
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+
+        style.configure(".", font=("Microsoft YaHei UI", 9), background="#F6F8FA", foreground="#17202A")
+        style.configure("TFrame", background="#F6F8FA")
+        style.configure("TLabelframe", background="#F6F8FA", bordercolor="#D7DEE8", relief="solid")
+        style.configure("TLabelframe.Label", background="#F6F8FA", foreground="#0F172A", font=("Microsoft YaHei UI", 9, "bold"))
+        style.configure("TLabel", background="#F6F8FA", foreground="#334155")
+        style.configure("TCheckbutton", background="#F6F8FA", foreground="#334155")
+        style.configure("TRadiobutton", background="#F6F8FA", foreground="#334155")
+        style.configure("TEntry", fieldbackground="#FFFFFF", bordercolor="#CBD5E1", lightcolor="#CBD5E1", darkcolor="#CBD5E1")
+        style.configure("TCombobox", fieldbackground="#FFFFFF", bordercolor="#CBD5E1")
+        style.configure("TButton", padding=(10, 5), background="#E8F3F6", foreground="#0F4C5C", bordercolor="#A8DADC")
+        style.map("TButton", background=[("active", "#D6EEF3")], foreground=[("active", "#0F4C5C")])
+        style.configure("Accent.TButton", padding=(14, 6), background="#0891B2", foreground="#FFFFFF", bordercolor="#0891B2")
+        style.map("Accent.TButton", background=[("active", "#0E7490")], foreground=[("active", "#FFFFFF")])
+        style.configure("Horizontal.TProgressbar", troughcolor="#E2E8F0", background="#0891B2")
+
+    def create_ui(self):
+        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
         # ===== 顶部 =====
         top_frame = ttk.Frame(main_frame)
@@ -133,7 +164,12 @@ class WatermarkApp:
             filename_frame,
             text="按原文件名导出（忽略前缀/后缀）",
             variable=self.use_original_name
-        ).pack(side=tk.LEFT, padx=12)
+        ).pack(side=tk.LEFT, padx=(12, 4))
+        ttk.Checkbutton(
+            filename_frame,
+            text="覆盖原文件",
+            variable=self.overwrite_original
+        ).pack(side=tk.LEFT, padx=8)
 
         crop_frame = ttk.LabelFrame(main_frame, text="图片裁切", padding="5")
         crop_frame.pack(fill=tk.X, pady=3)
@@ -187,19 +223,10 @@ class WatermarkApp:
         ).grid(row=2, column=1, sticky=tk.W, pady=3)
         ttk.Label(resize_frame, text="仅留白适配有效").grid(row=2, column=2, columnspan=2, sticky=tk.W, padx=8, pady=3)
 
-        ttk.Label(resize_frame, text="文件名包含(留空全部):").grid(row=3, column=0, sticky=tk.W, padx=4, pady=3)
-        ttk.Entry(resize_frame, textvariable=self.resize_filter_text, width=20).grid(row=3, column=1, columnspan=2, sticky=tk.W, pady=3)
-        ttk.Combobox(
+        ttk.Label(
             resize_frame,
-            textvariable=self.resize_filter_rule,
-            values=("contains", "starts with", "ends with"),
-            width=12,
-            state="readonly"
-        ).grid(row=3, column=3, sticky=tk.W, pady=3)
-
-        ttk.Radiobutton(resize_frame, text="覆盖原文件", variable=self.resize_output_mode, value="overwrite").grid(row=4, column=0, sticky=tk.W, padx=4, pady=3)
-        ttk.Radiobutton(resize_frame, text="添加后缀", variable=self.resize_output_mode, value="suffix").grid(row=4, column=1, sticky=tk.W, pady=3)
-        ttk.Entry(resize_frame, textvariable=self.resize_suffix, width=12).grid(row=4, column=2, sticky=tk.W, pady=3)
+            text="输出命名在“导出文件名”中统一设置。"
+        ).grid(row=3, column=0, columnspan=4, sticky=tk.W, padx=4, pady=(6, 3))
 
         # ===== 中部 =====
         middle_frame = ttk.Frame(main_frame)
@@ -316,7 +343,7 @@ class WatermarkApp:
 
         action_frame = ttk.Frame(bottom_frame)
         action_frame.pack(pady=3)
-        ttk.Button(action_frame, text="开始处理", command=self.start_processing).pack(side=tk.LEFT, padx=5)
+        ttk.Button(action_frame, text="开始处理", command=self.start_processing, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
         ttk.Button(action_frame, text="检查更新", command=lambda: self.start_update_check(False)).pack(side=tk.LEFT, padx=5)
 
         self.update_watermark_list()
@@ -561,6 +588,9 @@ class WatermarkApp:
         return cleaned
 
     def get_output_path(self, img_path, output_dir):
+        if self.overwrite_original.get():
+            return img_path
+
         save_dir = output_dir if output_dir else os.path.dirname(img_path)
         if output_dir and self.source_root:
             try:
@@ -570,18 +600,13 @@ class WatermarkApp:
             except ValueError:
                 pass
         original_name = os.path.basename(img_path)
-        resize_applies = self.enable_resize.get() and self.should_resize_image(img_path)
 
-        if resize_applies and self.resize_output_mode.get() == "overwrite":
-            output_name = original_name
-        elif self.use_original_name.get():
+        if self.use_original_name.get():
             output_name = original_name
         else:
             name, ext = os.path.splitext(original_name)
             prefix = self.clean_filename_part(self.output_prefix.get())
             suffix = self.clean_filename_part(self.output_suffix.get())
-            if resize_applies and self.resize_output_mode.get() == "suffix":
-                suffix += self.clean_filename_part(self.resize_suffix.get())
             output_name = f"{prefix}{name}{suffix}{ext}"
 
         return os.path.join(save_dir, output_name)
@@ -661,25 +686,7 @@ class WatermarkApp:
             return None
         return width, height
 
-    def should_resize_image(self, img_path):
-        if not self.enable_resize.get():
-            return False
-
-        keyword = self.resize_filter_text.get().strip().lower()
-        if not keyword:
-            return True
-
-        filename = os.path.basename(img_path).lower()
-        rule = self.resize_filter_rule.get()
-        if rule == "starts with":
-            return filename.startswith(keyword)
-        if rule == "ends with":
-            return filename.endswith(keyword)
-        return keyword in filename
-
     def resize_image(self, img, img_path=None):
-        if img_path and not self.should_resize_image(img_path):
-            return img
         if not self.enable_resize.get():
             return img
 
@@ -1282,7 +1289,7 @@ del "%~f0"
             if self.is_crop_enabled() and self.crop_box:
                 crop_text = f" | 裁切位置: {int(self.crop_focus_x.get())}%, {int(self.crop_focus_y.get())}%"
             resize_text = ""
-            if self.should_resize_image(img_path):
+            if self.enable_resize.get():
                 resize_text = f" | 尺寸: {img.width}x{img.height}"
             self.preview_info.config(text=f"{os.path.basename(img_path)}{crop_text}{resize_text} | 水印: {valid_count} 个")
 
@@ -1316,11 +1323,7 @@ del "%~f0"
         overwrite_risks = [
             img_path for img_path in self.source_images
             if os.path.abspath(self.get_output_path(img_path, output_dir)) == os.path.abspath(img_path)
-            and not (
-                resize_enabled
-                and self.resize_output_mode.get() == "overwrite"
-                and self.should_resize_image(img_path)
-            )
+            and not self.overwrite_original.get()
         ]
         if overwrite_risks:
             messagebox.showwarning(
@@ -1337,10 +1340,6 @@ del "%~f0"
 
         for i, img_path in enumerate(self.source_images):
             try:
-                should_resize = self.should_resize_image(img_path)
-                if resize_enabled and not should_resize and not crop_enabled and not valid_wms:
-                    continue
-
                 self.status_label.config(text=f"处理中: {os.path.basename(img_path)}")
                 self.progress['value'] = i + 1
                 self.root.update_idletasks()
