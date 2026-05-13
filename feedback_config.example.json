@@ -1,4 +1,6 @@
 {
-  "endpoint": "https://your-feedback-endpoint.example.com/submit",
+  "type": "feishu",
+  "endpoint": "https://open.feishu.cn/open-apis/bot/v2/hook/YOUR_BOT_TOKEN",
+  "secret": "",
   "headers": {}
 }

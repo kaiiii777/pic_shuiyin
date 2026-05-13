@@ -6,3 +6,5 @@ __pycache__/
 *.spec.bak
 *.log
 *.exe
+feedback/
+feedback_config.json

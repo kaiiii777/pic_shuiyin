@@ -2,7 +2,9 @@
 批量图片水印工具 v8
 支持水印缩放控制框、四角拖动独立拉伸
 """
+import base64
 import hashlib
+import hmac
 import json
 import os
 import subprocess
@@ -17,7 +19,7 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 
 
-APP_VERSION = "1.0.5"
+APP_VERSION = "1.0.6"
 UPDATE_API_URL = "https://api.github.com/repos/kaiiii777/pic_shuiyin/releases/latest"
 UPDATE_ASSET_NAME = "图片水印工具.exe"
 FEEDBACK_CONFIG_FILE = "feedback_config.json"
@@ -846,6 +848,10 @@ class WatermarkApp:
         if not endpoint:
             raise RuntimeError(f"未配置反馈接收地址，请在 {FEEDBACK_CONFIG_FILE} 中设置 endpoint")
 
+        if config.get("type", "feishu").lower() == "feishu":
+            self.submit_feishu_feedback(endpoint, payload, config.get("secret", "").strip())
+            return
+
         headers = {"Content-Type": "application/json; charset=utf-8"}
         for key, value in config.get("headers", {}).items():
             headers[str(key)] = str(value)
@@ -855,6 +861,46 @@ class WatermarkApp:
         with urllib.request.urlopen(request, timeout=15) as response:
             if response.status >= 400:
                 raise RuntimeError(f"HTTP {response.status}")
+
+    def submit_feishu_feedback(self, endpoint, payload, secret=""):
+        text = (
+            f"图片处理工具用户反馈\n"
+            f"版本：{payload.get('version', APP_VERSION)}\n"
+            f"时间：{payload.get('time', '')}\n"
+            f"联系方式：{payload.get('contact') or '未填写'}\n\n"
+            f"{payload.get('content', '')}"
+        )
+        feishu_payload = {
+            "msg_type": "text",
+            "content": {"text": text},
+        }
+
+        if secret:
+            timestamp = str(int(datetime.now().timestamp()))
+            string_to_sign = f"{timestamp}\n{secret}"
+            sign = base64.b64encode(
+                hmac.new(string_to_sign.encode("utf-8"), digestmod=hashlib.sha256).digest()
+            ).decode("utf-8")
+            feishu_payload["timestamp"] = timestamp
+            feishu_payload["sign"] = sign
+
+        data = json.dumps(feishu_payload, ensure_ascii=False).encode("utf-8")
+        request = urllib.request.Request(
+            endpoint,
+            data=data,
+            headers={"Content-Type": "application/json; charset=utf-8"},
+            method="POST"
+        )
+        with urllib.request.urlopen(request, timeout=15) as response:
+            response_text = response.read().decode("utf-8", errors="ignore")
+            if response.status >= 400:
+                raise RuntimeError(f"HTTP {response.status}")
+            try:
+                result = json.loads(response_text)
+            except json.JSONDecodeError:
+                result = {}
+            if result.get("code") not in (None, 0):
+                raise RuntimeError(result.get("msg") or response_text or "飞书机器人返回错误")
 
     def save_feedback_backup(self, payload):
         feedback_dir = os.path.join(self.get_app_dir(), "feedback")
